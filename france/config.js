@@ -73,7 +73,14 @@ export const MESSAGES = {
   botAdminOnly: '❌ The bot needs to be an admin to use this command!',
   ownerOnly: '❌ This command is for the group owner only!',
   
-  alive: {
+ anticall: {
+  notAuthorized: "❌ Only bot owner and sudo users can change anti-call settings.",
+  enabled: "✅ Anti-call is currently *ENABLED*\nAll incoming calls will be rejected.",
+  disabled: "❌ Anti-call is currently *DISABLED*\nIncoming calls will ring normally.",
+  toggledOn: "🛡️ Anti-call has been *ENABLED*\nAll incoming calls will be automatically rejected.",
+  toggledOff: "📞 Anti-call has been *DISABLED*\nIncoming calls will now ring normally."
+},
+   alive: {
     checking: '🔄 Checking bot status...',
     online: '🟢 *FLASH-MD-V3 IS ONLINE*',
     uptime: '*⏱️ Uptime:* {uptime}',

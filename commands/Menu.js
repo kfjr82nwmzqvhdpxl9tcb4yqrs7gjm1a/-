@@ -161,7 +161,7 @@ export const commands = [
                     grouped[category].push(cmd);
                 }
 
-                let menuText = `_${greeting} ${userName}_\n\n`;
+                let menuText = `${greeting} ${userName}\n\n`;
 
                 menuText += `╭━━━❒ ${applyStyle(`${botName} ${botVersion}`, 10)} ❒━━━╮\n`;
                 menuText += `┃❃╭────────────────\n`;

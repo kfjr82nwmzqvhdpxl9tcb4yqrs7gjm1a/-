@@ -162,7 +162,82 @@ export const commands = [
       await sock.sendMessage(from, { image: { url: pp }, caption: captionMsg }, { quoted: msg });
     }
   },
-{
+
+  {
+  name: 'whois',
+  description: 'User information',
+  category: 'USER',
+  execute: async ({ sock, from, msg }) => {
+    const targetJid = msg.message?.extendedTextMessage?.contextInfo?.participant || getSenderJid(msg);
+    const number = targetJid.split('@')[0];
+    
+    let pp;
+    try {
+      pp = await sock.profilePictureUrl(targetJid, 'image');
+    } catch {
+      const defaultImageMsg = await t(from, 'user', 'whoisDefaultImage');
+      pp = defaultImageMsg;
+    }
+    
+    let about = 'No status';
+    let setOn = 'Unknown';
+    let setAt = 'Unknown';
+    
+    try {
+      const statusArray = await sock.fetchStatus(targetJid);
+      console.log('[WHOIS] Full status response:', JSON.stringify(statusArray, null, 2));
+      
+      if (statusArray && statusArray.length > 0) {
+        const statusObj = statusArray[0];
+        console.log('[WHOIS] Status object:', JSON.stringify(statusObj, null, 2));
+        
+        if (statusObj.status) {
+          about = statusObj.status;
+        }
+        
+        if (statusObj.setAt) {
+          const d = new Date(statusObj.setAt * 1000);
+          if (!isNaN(d.getTime())) {
+            setOn = d.toLocaleDateString('en-GB');
+            setAt = d.toLocaleTimeString('en-GB');
+          }
+        }
+      }
+    } catch (err) {
+      console.log('[WHOIS] fetchStatus error:', err.message);
+    }
+    
+    let name = msg.pushName || number;
+    try {
+      const contact = await sock.onWhatsApp(targetJid);
+      if (contact && contact[0] && contact[0].notify) {
+        name = contact[0].notify;
+      }
+    } catch {}
+    
+    const aboutLabel = await t(from, 'user', 'whoisAbout');
+    const nameLabel = await t(from, 'user', 'whoisName');
+    const setOnLabel = await t(from, 'user', 'whoisSetOn');
+    const setAtLabel = await t(from, 'user', 'whoisSetAt');
+    const footerMsg = await t(from, 'user', 'whoisFooter');
+    
+    const caption = `👤 *${aboutLabel}*\n\n${about}\n\n*${nameLabel}:* ${name}\n📱 *Number:* ${number}\n\n📅 *${setOnLabel}:* ${setOn}\n🕒 *${setAtLabel}:* ${setAt}\n\n${footerMsg}`;
+    
+    await sock.sendMessage(
+      from,
+      {
+        image: { url: pp },
+        caption,
+        mentions: [targetJid]
+      },
+      { quoted: msg }
+    );
+  }
+}, 
+  
+  
+  
+  /*{
   name: 'whois',
   description: 'User information',
   category: 'USER',
@@ -228,7 +303,7 @@ export const commands = [
       { quoted: msg }
     );
   }
-}, 
+}, */
   {
     name: 'mygroups',
     description: 'List all groups',

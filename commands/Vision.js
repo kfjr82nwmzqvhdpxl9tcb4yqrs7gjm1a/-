@@ -1,6 +1,21 @@
 import { downloadMediaMessage } from '@whiskeysockets/baileys';
 import { t, translate, translateAIResponse, getUserLang } from '../france/translator.js';
 import { API_CONFIG } from '../france/config.js';
+import axios from 'axios';
+import FormData from 'form-data';
+import fs from 'fs-extra';
+import path from 'path';
+
+async function uploadToImgBB(buffer) {
+  const form = new FormData();
+  form.append('image', buffer.toString('base64'));
+  
+  const { data } = await axios.post('https://api.imgbb.com/1/upload?key=8b468bac6311f8b2fd23d20e90186ac8', form, {
+    headers: form.getHeaders()
+  });
+
+  return data.data.url;
+}
 
 export const commands = [
   {
@@ -35,21 +50,7 @@ export const commands = [
           { logger: console }
         );
 
-        const formData = new FormData();
-        formData.append('image', buffer, 'image.jpg');
-
-        const uploadResponse = await fetch('https://api.imgbb.com/1/upload?key=72utkjatCBC-PDcx7-Kcvgod7-QOFAm2fXwEeW8b8cc', {
-          method: 'POST',
-          body: formData
-        });
-
-        const uploadData = await uploadResponse.json();
-        
-        if (!uploadData.success) {
-          throw new Error('Failed to upload image');
-        }
-
-        const imageUrl = uploadData.data.url;
+        const imageUrl = await uploadToImgBB(buffer);
         const encodedQuery = encodeURIComponent(query);
         
         const response = await fetch(`${API_CONFIG.vision.url}?image=${encodeURIComponent(imageUrl)}&q=${encodedQuery}`, {

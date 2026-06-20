@@ -184,45 +184,33 @@ export const commands = [
     
     try {
       const statusArray = await sock.fetchStatus(targetJid);
-      console.log('[WHOIS] Full statusArray:', JSON.stringify(statusArray, null, 2));
-      console.log('[WHOIS] statusArray length:', statusArray?.length);
-      console.log('[WHOIS] statusArray type:', typeof statusArray);
-      console.log('[WHOIS] statusArray[0]:', JSON.stringify(statusArray?.[0], null, 2));
-      console.log('[WHOIS] statusArray[0] keys:', Object.keys(statusArray?.[0] || {}));
-      console.log('[WHOIS] statusArray[0].status:', statusArray?.[0]?.status);
-      console.log('[WHOIS] statusArray[0].status type:', typeof statusArray?.[0]?.status);
-      console.log('[WHOIS] statusArray[0].status keys:', Object.keys(statusArray?.[0]?.status || {}));
-      console.log('[WHOIS] statusArray[0].setAt:', statusArray?.[0]?.setAt);
-      console.log('[WHOIS] statusArray[0].setAt type:', typeof statusArray?.[0]?.setAt);
       
       if (statusArray && statusArray.length > 0) {
         const statusObj = statusArray[0];
         
         if (statusObj.status) {
-          if (typeof statusObj.status === 'string') {
+          if (typeof statusObj.status === 'object') {
+            about = statusObj.status.status || 'No status';
+            
+            if (statusObj.status.setAt) {
+              const d = new Date(statusObj.status.setAt);
+              if (!isNaN(d.getTime())) {
+                setOn = d.toLocaleDateString('en-GB');
+                setAt = d.toLocaleTimeString('en-GB');
+              }
+            }
+          } else if (typeof statusObj.status === 'string') {
             about = statusObj.status;
-          } else if (typeof statusObj.status === 'object') {
-            about = statusObj.status.status || statusObj.status.text || JSON.stringify(statusObj.status);
-          }
-        }
-        
-        if (statusObj.setAt) {
-          const d = new Date(statusObj.setAt * 1000);
-          if (!isNaN(d.getTime())) {
-            setOn = d.toLocaleDateString('en-GB');
-            setAt = d.toLocaleTimeString('en-GB');
           }
         }
       }
     } catch (err) {
       console.log('[WHOIS] fetchStatus error:', err.message);
-      console.log('[WHOIS] fetchStatus error stack:', err.stack);
     }
     
     let name = msg.pushName || number;
     try {
       const contact = await sock.onWhatsApp(targetJid);
-      console.log('[WHOIS] onWhatsApp response:', JSON.stringify(contact, null, 2));
       if (contact && contact[0] && contact[0].notify) {
         name = contact[0].notify;
       }
@@ -249,6 +237,7 @@ export const commands = [
     );
   }
 }, 
+      
   {
     name: 'mygroups',
     description: 'List all groups',

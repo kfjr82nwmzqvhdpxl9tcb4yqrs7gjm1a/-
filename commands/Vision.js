@@ -35,17 +35,25 @@ export const commands = [
           { logger: console }
         );
 
-        const base64Image = buffer.toString('base64');
-        
-        const response = await fetch(API_CONFIG.vision.url, {
+        const formData = new FormData();
+        formData.append('image', buffer, 'image.jpg');
+
+        const uploadResponse = await fetch('https://api.imgbb.com/1/upload?key=72utkjatCBC-PDcx7-Kcvgod7-QOFAm2fXwEeW8b8cc', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            image: base64Image,
-            q: query
-          })
+          body: formData
+        });
+
+        const uploadData = await uploadResponse.json();
+        
+        if (!uploadData.success) {
+          throw new Error('Failed to upload image');
+        }
+
+        const imageUrl = uploadData.data.url;
+        const encodedQuery = encodeURIComponent(query);
+        
+        const response = await fetch(`${API_CONFIG.vision.url}?image=${encodeURIComponent(imageUrl)}&q=${encodedQuery}`, {
+          method: 'GET'
         });
 
         const data = await response.json();

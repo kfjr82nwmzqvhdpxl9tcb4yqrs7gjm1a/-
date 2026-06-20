@@ -1,6 +1,6 @@
 import { downloadMediaMessage } from '@whiskeysockets/baileys';
-import { geminiVision2, MESSAGES } from '../france/index.js';
 import { t, translate, translateAIResponse, getUserLang } from '../france/translator.js';
+import { API_CONFIG } from '../france/config.js';
 
 export const commands = [
   {
@@ -36,9 +36,25 @@ export const commands = [
         );
 
         const base64Image = buffer.toString('base64');
-        const result = await geminiVision2(base64Image, query);
         
-        const translatedResult = await translateAIResponse(from, result);
+        const response = await fetch(API_CONFIG.vision.url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            image: base64Image,
+            q: query
+          })
+        });
+
+        const data = await response.json();
+        
+        if (!data.status) {
+          throw new Error('API request failed');
+        }
+
+        const translatedResult = await translateAIResponse(from, data.result);
         
         const successTemplate = await t(from, 'vision', 'success');
 

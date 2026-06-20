@@ -1,3 +1,4 @@
+
 export const API_CONFIG = {
   acrcloud: {
     host: 'identify-us-west-2.acrcloud.com',
@@ -59,6 +60,10 @@ export const API_CONFIG = {
   country: {
     url: 'https://api.siputzx.my.id/api/tools/countryInfo',
     timeout: 15000
+  },
+  vision: {
+    url: 'https://ravenn.site/ai/vision',
+    timeout: 30000
   }
 }
 

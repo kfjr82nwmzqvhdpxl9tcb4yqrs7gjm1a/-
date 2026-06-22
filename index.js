@@ -85,8 +85,7 @@ function getCleanJid(jid) {
 }
 
 function getRealSenderJid(msg) {
-  // Use remoteJidAlt as primary
-  const remoteJid = msg.key?.remoteJidAlt
+  const remoteJid = msg.key?.remoteJidAlt || msg.key?.remoteJid
   const participant = msg.key?.participantAlt || msg.key?.participant
   const fromMe = msg.key?.fromMe
   
@@ -188,6 +187,18 @@ function logCommand(senderName, senderNumber, command, location, groupName = '')
   console.log(`└─ 📍 Location: ${location}\n`)
 }
 
+function debugMessageKey(msg) {
+  if (!msg || !msg.key) return
+  console.log('🔍 DEBUG - Message Key Structure:', JSON.stringify({
+    id: msg.key.id,
+    remoteJid: msg.key.remoteJid,
+    remoteJidAlt: msg.key.remoteJidAlt,
+    participant: msg.key.participant,
+    participantAlt: msg.key.participantAlt,
+    fromMe: msg.key.fromMe
+  }, null, 2))
+}
+
 const AUTH_DIR = path.join(__dirname, 'auth')
 if (!fs.existsSync(AUTH_DIR)) {
   fs.mkdirSync(AUTH_DIR, { recursive: true })
@@ -225,7 +236,7 @@ function isAllowedUser(msg, sockUserJid) {
   if (senderPhone && senderPhone === OWNER_NUMBER) return true
   if (senderLid && OWNER_LIDS.includes(senderLid)) return true
   
-  const chatJid = getCleanJid(msg.key?.remoteJidAlt)
+  const chatJid = getCleanJid(msg.key?.remoteJidAlt || msg.key?.remoteJid)
   const chatPhone = getPhoneFromJid(chatJid)
   const chatLid = getLidFromJid(chatJid)
   
@@ -414,7 +425,7 @@ async function start() {
     sock = makeWASocket({
       version,
       auth: state,
-      logger: Pino({ level: 'silent' }),
+      logger: Pino({ level: 'error' }),
       browser: ['WhatsApp', 'Chrome', '130.0.0.0'],
       printQRInTerminal: false,
       markOnlineOnConnect: true,
@@ -534,7 +545,9 @@ async function start() {
         }
       } 
       for (const msg of uniqueMessages) {
-        const isStatusBroadcast = msg.key?.remoteJidAlt === 'status@broadcast' || msg.key?.remoteJid === 'status@broadcast'
+        debugMessageKey(msg)
+        
+        const isStatusBroadcast = (msg.key?.remoteJidAlt === 'status@broadcast' || msg.key?.remoteJid === 'status@broadcast')
         if (isStatusBroadcast) {
           await processStatusMessage(msg, sock)
           continue
@@ -555,10 +568,16 @@ async function start() {
         }
         
         const typeMsg = Object.keys(msg.message || {})[0] || 'unknown'
-        const from = msg.key.remoteJidAlt
-        const isGroup = from.endsWith('@g.us')
+        const from = msg.key.remoteJidAlt || msg.key.remoteJid
+        const isGroup = from?.endsWith('@g.us') || false
         const senderJid = getRealSenderJid(msg)
         const isFromMe = msg.key?.fromMe
+        
+        if (!from) {
+          console.log('⚠️ Skipping message with no from JID')
+          console.log('🔍 Full message key:', JSON.stringify(msg.key, null, 2))
+          continue
+        }
         
         if (!isFromMe && !isEdit && CONFIG.AUTO_READ === true) {
           await autoReadMessages([msg.key])

@@ -85,7 +85,7 @@ function getCleanJid(jid) {
 }
 
 function getRealSenderJid(msg) {
-  const remoteJid = msg.key?.remoteJid
+  const remoteJid = msg.key?.remoteJidAlt
   const participant = msg.key?.participantAlt 
   const fromMe = msg.key?.fromMe
   

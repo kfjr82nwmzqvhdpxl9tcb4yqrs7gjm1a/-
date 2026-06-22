@@ -262,6 +262,27 @@ let sock = null
 const groupCache = new Map()
 const readMessagesQueue = new Set()
 
+async function safeSendMessage(jid, content, options = {}) {
+  try {
+    console.log(`📤 Sending to ${jid}`)
+    const result = await sock.sendMessage(jid, content, options)
+    console.log(`✅ Message sent successfully`)
+    return result
+  } catch (error) {
+    console.error(`❌ Send failed: ${error.message}`)
+    try {
+      const fallbackResult = await sock.sendMessage(jid, {
+        text: typeof content === 'string' ? content : content.text || 'Error sending message'
+      })
+      console.log(`✅ Fallback message sent`)
+      return fallbackResult
+    } catch (fallbackError) {
+      console.error(`❌ Fallback failed: ${fallbackError.message}`)
+      return null
+    }
+  }
+}
+
 async function autoReadMessages(keys) {
   if (!CONFIG.AUTO_READ) return
   
@@ -427,7 +448,7 @@ async function start() {
             try {
               const ownerJid = getOwnerJid()
               if (ownerJid) {
-                await sock.sendMessage(ownerJid, {
+                await safeSendMessage(ownerJid, {
                   text: connInfo,
                   contextInfo: {
                     forwardingScore: 1,
@@ -481,7 +502,6 @@ async function start() {
         }
       } 
       for (const msg of uniqueMessages) {
-       // const isStatusBroadcast = msg.key?.remoteJidAlt === 'status@broadcast'
         const isStatusBroadcast = msg.key?.remoteJid === 'status@broadcast' || msg.key?.remoteJidAlt === 'status@broadcast'
         if (isStatusBroadcast) {
           await processStatusMessage(msg, sock)
@@ -698,13 +718,6 @@ async function start() {
         const displayNumber = senderNumber === '120363399604046397' ? 'Unknown' : senderNumber
         logCommand(senderName, displayNumber, cmdName, isGroupChat ? groupName : 'Private Chat', groupName)
         
-        await sock.sendMessage(msg.key.remoteJid, {
-          react: {
-            text: '⚡',
-            key: msg.key
-          }
-        })
-        
         try {
           await command.execute({
             sock,
@@ -721,7 +734,7 @@ async function start() {
           })
         } catch (error) {
           logError('Command Execution', cmdName, senderJid, error.message)
-          await sock.sendMessage(from, { text: '❌ Command error' })
+          await safeSendMessage(from, { text: '❌ Command error', quoted: msg })
         } finally {
           setTimeout(() => {
             executingCommands.delete(commandKey)

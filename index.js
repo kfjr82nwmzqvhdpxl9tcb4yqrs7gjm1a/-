@@ -494,7 +494,7 @@ async function start() {
     setInterval(async () => {
       try {
         if (sock?.user?.id) {
-          await sock.sendPresenceUpdate('available')
+          await sock.sendPresenceUpdate('unavailable')
         }
       } catch (e) {
       }
@@ -554,7 +554,7 @@ async function start() {
         }
         
         const typeMsg = Object.keys(msg.message || {})[0] || 'unknown'
-        const from = msg.key.remoteJid
+        const from = msg.key.remoteJidAlt
         const isGroup = from.endsWith('@g.us')
         const senderJid = getRealSenderJid(msg)
         const isFromMe = msg.key?.fromMe

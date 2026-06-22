@@ -571,12 +571,12 @@ async function start() {
         }
         
         const typeMsg = Object.keys(msg.message || {})[0] || 'unknown'
-        const from = msg.key.remoteJidAlt || msg.key.remoteJid
-        const isGroup = from?.endsWith('@g.us') || false
+        const chatId = msg.key.remoteJid || msg.key.remoteJidAlt
+        const isGroup = chatId?.endsWith('@g.us') || false
         const senderJid = getRealSenderJid(msg)
         const isFromMe = msg.key?.fromMe
         
-        if (!from) {
+        if (!chatId) {
           console.log('⚠️ Skipping message with no from JID')
           console.log('🔍 Full message key:', JSON.stringify(msg.key, null, 2))
           continue
@@ -587,24 +587,24 @@ async function start() {
         }
         
         if (!isFromMe && type !== 'edit' && shouldShowPresence(isGroup)) {
-          await setChatPresence(from, isGroup)
+          await setChatPresence(chatId, isGroup)
         }
         
         let senderName = msg.pushName || 'Unknown'
-        let chatName = from.split('@')[0]
+        let chatName = chatId.split('@')[0]
         
         if (isGroup) {
           try {
-            const metadata = await fetchGroupMetadata(from)
+            const metadata = await fetchGroupMetadata(chatId)
             if (metadata) {
               chatName = metadata.subject || 'Group'
             }
           } catch (error) {
-            logError('Fetch Group Name', null, from, error.message)
+            logError('Fetch Group Name', null, chatId, error.message)
           }
-          if (senderJid && senderJid !== from) {
+          if (senderJid && senderJid !== chatId) {
             try {
-              const metadata = await fetchGroupMetadata(from)
+              const metadata = await fetchGroupMetadata(chatId)
               if (metadata && metadata.participants) {
                 const participant = metadata.participants.find(p => p.id === senderJid)
                 if (participant) {
@@ -653,8 +653,8 @@ async function start() {
           if (typeMsg === 'audioMessage' && !isFromMe && shouldShowPresence(isGroup)) {
             const presenceType = getPresenceType(isGroup)
             if (presenceType === 'recording') {
-              await setChatPresence(from, isGroup)
-              setTimeout(() => clearChatPresence(from), 5000)
+              await setChatPresence(chatId, isGroup)
+              setTimeout(() => clearChatPresence(chatId), 5000)
             }
           }
           continue
@@ -663,10 +663,10 @@ async function start() {
         const sockUserJid = sock.user?.id
         let groupName = ''
         let isGroupChat = false
-        if (from.endsWith('@g.us')) {
+        if (chatId.endsWith('@g.us')) {
           isGroupChat = true
           try {
-            const metadata = await sock.groupMetadata(from)
+            const metadata = await sock.groupMetadata(chatId)
             const participant = metadata.participants.find(p => p.id === senderJid)
             if (participant) {
               senderName = participant.name || participant.notify || senderName
@@ -681,7 +681,7 @@ async function start() {
         
         formatLogMessage(
           isGroupChat ? 'GROUP' : 'PRIVATE',
-          from,
+          chatId,
           displaySenderJid,
           senderName,
           body,
@@ -724,7 +724,7 @@ async function start() {
         
         if (!isCommand) {
           if (shouldShowPresence(isGroup)) {
-            setTimeout(() => clearChatPresence(from), 5000)
+            setTimeout(() => clearChatPresence(chatId), 5000)
           }
           continue
         }
@@ -734,7 +734,7 @@ async function start() {
           if (!isAllowed) {
             logError('Unauthorized Access', null, senderJid, 'User not authorized in private mode')
             if (shouldShowPresence(isGroup)) {
-              setTimeout(() => clearChatPresence(from), 5000)
+              setTimeout(() => clearChatPresence(chatId), 5000)
             }
             continue
           }
@@ -746,7 +746,7 @@ async function start() {
         
         if (!command) {
           if (shouldShowPresence(isGroup)) {
-            setTimeout(() => clearChatPresence(from), 5000)
+            setTimeout(() => clearChatPresence(chatId), 5000)
           }
           continue
         }
@@ -755,7 +755,7 @@ async function start() {
         if (executingCommands.has(commandKey)) {
           console.log(`⏩ Command ${name} already executing for ${msg.key.id}`)
           if (shouldShowPresence(isGroup)) {
-            setTimeout(() => clearChatPresence(from), 5000)
+            setTimeout(() => clearChatPresence(chatId), 5000)
           }
           continue
         }
@@ -775,7 +775,7 @@ async function start() {
         try {
           await command.execute({
             sock,
-            from,
+            from: chatId,
             msg,
             args,
             text: args.join(' '),
@@ -788,13 +788,13 @@ async function start() {
           })
         } catch (error) {
           logError('Command Execution', cmdName, senderJid, error.message)
-          await safeSendMessage(from, { text: '❌ Command error', quoted: msg })
+          await safeSendMessage(chatId, { text: '❌ Command error', quoted: msg })
         } finally {
           setTimeout(() => {
             executingCommands.delete(commandKey)
           }, 30000)
           if (shouldShowPresence(isGroup)) {
-            setTimeout(() => clearChatPresence(from), 5000)
+            setTimeout(() => clearChatPresence(chatId), 5000)
           }
         }
       }

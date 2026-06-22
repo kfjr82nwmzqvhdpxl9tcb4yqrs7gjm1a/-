@@ -264,22 +264,23 @@ const readMessagesQueue = new Set()
 
 async function safeSendMessage(jid, content, options = {}) {
   try {
-    console.log(`📤 Sending to ${jid}`)
     const result = await sock.sendMessage(jid, content, options)
-    console.log(`✅ Message sent successfully`)
     return result
   } catch (error) {
-    console.error(`❌ Send failed: ${error.message}`)
-    try {
-      const fallbackResult = await sock.sendMessage(jid, {
-        text: typeof content === 'string' ? content : content.text || 'Error sending message'
-      })
-      console.log(`✅ Fallback message sent`)
-      return fallbackResult
-    } catch (fallbackError) {
-      console.error(`❌ Fallback failed: ${fallbackError.message}`)
-      return null
+    console.error(`Send failed: ${error.message}`)
+    if (error.message.includes('missing tctoken')) {
+      console.log('Attempting to refresh connection...')
+      try {
+        await sock.sendPresenceUpdate('available')
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        const retryResult = await sock.sendMessage(jid, content, options)
+        return retryResult
+      } catch (retryError) {
+        console.error(`Retry failed: ${retryError.message}`)
+        return null
+      }
     }
+    return null
   }
 }
 
@@ -391,15 +392,35 @@ function getOwnerJid() {
 
 async function start() {
   try {
+    if (fs.existsSync(AUTH_DIR)) {
+      const credsPath = path.join(AUTH_DIR, 'creds.json')
+      if (fs.existsSync(credsPath)) {
+        const creds = JSON.parse(fs.readFileSync(credsPath, 'utf8'))
+        const age = Date.now() - new Date(creds.creationTime).getTime()
+        if (age > 7 * 24 * 60 * 60 * 1000) {
+          console.log('Session older than 7 days, regenerating...')
+          fs.rmSync(AUTH_DIR, { recursive: true, force: true })
+          fs.mkdirSync(AUTH_DIR, { recursive: true })
+          if (CONFIG.SESSION) {
+            fs.writeFileSync(path.join(AUTH_DIR, 'creds.json'), Buffer.from(CONFIG.SESSION, 'base64'))
+          }
+        }
+      }
+    }
+    
     const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR)
     const { version } = await fetchLatestBaileysVersion()
     sock = makeWASocket({
       version,
       auth: state,
-      logger: Pino({ level: 'info' }),
-      browser: ['Flash-MD', 'Chrome', '3.0.0'],
+      logger: Pino({ level: 'silent' }),
+      browser: ['WhatsApp', 'Chrome', '130.0.0.0'],
       printQRInTerminal: false,
-      markOnlineOnConnect: false
+      markOnlineOnConnect: true,
+      syncFullHistory: true,
+      patchMessageBeforeSending: (msg) => {
+        return msg
+      }
     })
     sock.ev.on('creds.update', saveCreds)
     sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
@@ -469,6 +490,16 @@ async function start() {
         }
       }
     })
+    
+    setInterval(async () => {
+      try {
+        if (sock?.user?.id) {
+          await sock.sendPresenceUpdate('available')
+        }
+      } catch (e) {
+      }
+    }, 60000)
+    
     if (CONFIG.ANTICALL === true) {
       sock.ev.on('call', async (callData) => {
         try {

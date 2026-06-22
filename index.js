@@ -85,8 +85,9 @@ function getCleanJid(jid) {
 }
 
 function getRealSenderJid(msg) {
+  // Use remoteJidAlt as primary
   const remoteJid = msg.key?.remoteJidAlt
-  const participant = msg.key?.participantAlt 
+  const participant = msg.key?.participantAlt || msg.key?.participant
   const fromMe = msg.key?.fromMe
   
   if (fromMe) {
@@ -533,7 +534,7 @@ async function start() {
         }
       } 
       for (const msg of uniqueMessages) {
-        const isStatusBroadcast = msg.key?.remoteJid === 'status@broadcast' || msg.key?.remoteJidAlt === 'status@broadcast'
+        const isStatusBroadcast = msg.key?.remoteJidAlt === 'status@broadcast' || msg.key?.remoteJid === 'status@broadcast'
         if (isStatusBroadcast) {
           await processStatusMessage(msg, sock)
           continue

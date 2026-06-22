@@ -375,7 +375,7 @@ async function start() {
     sock = makeWASocket({
       version,
       auth: state,
-      logger: Pino({ level: 'silent' }),
+      logger: Pino({ level: 'error' }),
       browser: ['Flash-MD', 'Chrome', '3.0.0'],
       printQRInTerminal: false,
       markOnlineOnConnect: false

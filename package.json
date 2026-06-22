@@ -17,7 +17,7 @@
   "license": "MIT",
   "dependencies": {
     "@hapi/boom": "^10.0.1",
-    "@whiskeysockets/baileys": "7.0.0-rc13",
+    "@whiskeysockets/baileys": "git+https://lyfe00011-admin@bitbucket.org/lyfe00011/baileys.git",
     "@xaviabot/fb-downloader": "^1.0.14",
     "adm-zip": "0.5.16",
     "aptoide_scrapper_fixed": "1.0.2",

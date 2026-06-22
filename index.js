@@ -571,7 +571,7 @@ async function start() {
         }
         
         const typeMsg = Object.keys(msg.message || {})[0] || 'unknown'
-        const chatId = msg.key.remoteJid || msg.key.remoteJidAlt
+        const chatId = msg.key.remoteJidAlt || msg.key.remoteJid
         const isGroup = chatId?.endsWith('@g.us') || false
         const senderJid = getRealSenderJid(msg)
         const isFromMe = msg.key?.fromMe

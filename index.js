@@ -85,7 +85,7 @@ function getCleanJid(jid) {
 }
 
 function getRealSenderJid(msg) {
-  const remoteJid = msg.key?.remoteJidAlt 
+  const remoteJid = msg.key?.remoteJid
   const participant = msg.key?.participantAlt 
   const fromMe = msg.key?.fromMe
   
@@ -375,7 +375,7 @@ async function start() {
     sock = makeWASocket({
       version,
       auth: state,
-      logger: Pino({ level: 'error' }),
+      logger: Pino({ level: 'info' }),
       browser: ['Flash-MD', 'Chrome', '3.0.0'],
       printQRInTerminal: false,
       markOnlineOnConnect: false

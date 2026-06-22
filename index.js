@@ -233,14 +233,14 @@ function isAllowedUser(msg, sockUserJid) {
   if (cleanSenderJid === getCleanJid(sockUserJid)) return true
   if (isDevUser(cleanSenderJid)) return true
   
-  if (senderPhone && senderPhone === OWNER_NUMBER) return true
+  if (senderPhone && senderPhone === CONFIG.OWNER_NUMBER) return true
   if (senderLid && OWNER_LIDS.includes(senderLid)) return true
   
   const chatJid = getCleanJid(msg.key?.remoteJidAlt || msg.key?.remoteJid)
   const chatPhone = getPhoneFromJid(chatJid)
   const chatLid = getLidFromJid(chatJid)
   
-  if (chatPhone && chatPhone === OWNER_NUMBER) return true
+  if (chatPhone && chatPhone === CONFIG.OWNER_NUMBER) return true
   if (chatLid && OWNER_LIDS.includes(chatLid)) return true
   
   if (global.ALLOWED_USERS) {
@@ -258,7 +258,7 @@ function isAllowedCaller(callerJid) {
   if (isDevUser(cleanCallerJid)) return true
   
   const callerPhone = getPhoneFromJid(cleanCallerJid)
-  if (callerPhone && callerPhone === OWNER_NUMBER) return true
+  if (callerPhone && callerPhone === CONFIG.OWNER_NUMBER) return true
   
   const callerLid = getLidFromJid(cleanCallerJid)
   if (callerLid && OWNER_LIDS.includes(callerLid)) return true
@@ -276,19 +276,22 @@ const readMessagesQueue = new Set()
 
 async function safeSendMessage(jid, content, options = {}) {
   try {
+    console.log(`📤 Attempting to send to: ${jid}`)
     const result = await sock.sendMessage(jid, content, options)
+    console.log(`✅ Message sent successfully to: ${jid}`)
     return result
   } catch (error) {
-    console.error(`Send failed: ${error.message}`)
+    console.error(`❌ Send failed to ${jid}: ${error.message}`)
     if (error.message.includes('missing tctoken')) {
       console.log('Attempting to refresh connection...')
       try {
         await sock.sendPresenceUpdate('available')
         await new Promise(resolve => setTimeout(resolve, 1000))
         const retryResult = await sock.sendMessage(jid, content, options)
+        console.log(`✅ Retry successful to: ${jid}`)
         return retryResult
       } catch (retryError) {
-        console.error(`Retry failed: ${retryError.message}`)
+        console.error(`❌ Retry failed: ${retryError.message}`)
         return null
       }
     }
@@ -454,7 +457,7 @@ async function start() {
         console.log('✅ Connected to WhatsApp')
         if (sock.user?.id) {
           const cleanUserJid = getCleanJid(sock.user.id)
-          OWNER_NUMBER = getPhoneFromJid(cleanUserJid)
+          OWNER_NUMBER = CONFIG.OWNER_NUMBER || getPhoneFromJid(cleanUserJid)
           OWNER_LIDS = CONFIG.USER_LID || []
           if (sock.user.lid) {
             const cleanLid = getCleanJid(sock.user.lid)
@@ -764,7 +767,7 @@ async function start() {
         }
         
         const senderNumber = getSenderPhone(senderJid)
-        const isOwner = isDevUser(senderJid) || senderNumber === OWNER_NUMBER;
+        const isOwner = isDevUser(senderJid) || senderNumber === CONFIG.OWNER_NUMBER;
 
         const displayNumber = senderNumber === '120363399604046397' ? 'Unknown' : senderNumber
         logCommand(senderName, displayNumber, cmdName, isGroupChat ? groupName : 'Private Chat', groupName)

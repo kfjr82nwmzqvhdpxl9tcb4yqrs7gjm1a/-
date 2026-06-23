@@ -85,8 +85,8 @@ function getCleanJid(jid) {
 }
 
 function getRealSenderJid(msg) {
-  const remoteJid = msg.key?.remoteJidAlt || msg.key?.remoteJid
-  const participant = msg.key?.participantAlt || msg.key?.participant
+  const remoteJid = msg.key?.remoteJidAlt 
+  const participant = msg.key?.participantAlt 
   const fromMe = msg.key?.fromMe
   
   if (fromMe) {
@@ -187,18 +187,6 @@ function logCommand(senderName, senderNumber, command, location, groupName = '')
   console.log(`└─ 📍 Location: ${location}\n`)
 }
 
-function debugMessageKey(msg) {
-  if (!msg || !msg.key) return
-  console.log('🔍 DEBUG - Message Key Structure:', JSON.stringify({
-    id: msg.key.id,
-    remoteJid: msg.key.remoteJid,
-    remoteJidAlt: msg.key.remoteJidAlt,
-    participant: msg.key.participant,
-    participantAlt: msg.key.participantAlt,
-    fromMe: msg.key.fromMe
-  }, null, 2))
-}
-
 const AUTH_DIR = path.join(__dirname, 'auth')
 if (!fs.existsSync(AUTH_DIR)) {
   fs.mkdirSync(AUTH_DIR, { recursive: true })
@@ -233,14 +221,14 @@ function isAllowedUser(msg, sockUserJid) {
   if (cleanSenderJid === getCleanJid(sockUserJid)) return true
   if (isDevUser(cleanSenderJid)) return true
   
-  if (senderPhone && senderPhone === CONFIG.OWNER_NUMBER) return true
+  if (senderPhone && senderPhone === OWNER_NUMBER) return true
   if (senderLid && OWNER_LIDS.includes(senderLid)) return true
   
-  const chatJid = getCleanJid(msg.key?.remoteJidAlt || msg.key?.remoteJid)
+  const chatJid = getCleanJid(msg.key?.remoteJidAlt)
   const chatPhone = getPhoneFromJid(chatJid)
   const chatLid = getLidFromJid(chatJid)
   
-  if (chatPhone && chatPhone === CONFIG.OWNER_NUMBER) return true
+  if (chatPhone && chatPhone === OWNER_NUMBER) return true
   if (chatLid && OWNER_LIDS.includes(chatLid)) return true
   
   if (global.ALLOWED_USERS) {
@@ -258,7 +246,7 @@ function isAllowedCaller(callerJid) {
   if (isDevUser(cleanCallerJid)) return true
   
   const callerPhone = getPhoneFromJid(cleanCallerJid)
-  if (callerPhone && callerPhone === CONFIG.OWNER_NUMBER) return true
+  if (callerPhone && callerPhone === OWNER_NUMBER) return true
   
   const callerLid = getLidFromJid(cleanCallerJid)
   if (callerLid && OWNER_LIDS.includes(callerLid)) return true
@@ -273,31 +261,6 @@ app.listen(CONFIG.PORT)
 let sock = null
 const groupCache = new Map()
 const readMessagesQueue = new Set()
-
-async function safeSendMessage(jid, content, options = {}) {
-  try {
-    console.log(`📤 Attempting to send to: ${jid}`)
-    const result = await sock.sendMessage(jid, content, options)
-    console.log(`✅ Message sent successfully to: ${jid}`)
-    return result
-  } catch (error) {
-    console.error(`❌ Send failed to ${jid}: ${error.message}`)
-    if (error.message.includes('missing tctoken')) {
-      console.log('Attempting to refresh connection...')
-      try {
-        await sock.sendPresenceUpdate('available')
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        const retryResult = await sock.sendMessage(jid, content, options)
-        console.log(`✅ Retry successful to: ${jid}`)
-        return retryResult
-      } catch (retryError) {
-        console.error(`❌ Retry failed: ${retryError.message}`)
-        return null
-      }
-    }
-    return null
-  }
-}
 
 async function autoReadMessages(keys) {
   if (!CONFIG.AUTO_READ) return
@@ -407,35 +370,15 @@ function getOwnerJid() {
 
 async function start() {
   try {
-    if (fs.existsSync(AUTH_DIR)) {
-      const credsPath = path.join(AUTH_DIR, 'creds.json')
-      if (fs.existsSync(credsPath)) {
-        const creds = JSON.parse(fs.readFileSync(credsPath, 'utf8'))
-        const age = Date.now() - new Date(creds.creationTime).getTime()
-        if (age > 7 * 24 * 60 * 60 * 1000) {
-          console.log('Session older than 7 days, regenerating...')
-          fs.rmSync(AUTH_DIR, { recursive: true, force: true })
-          fs.mkdirSync(AUTH_DIR, { recursive: true })
-          if (CONFIG.SESSION) {
-            fs.writeFileSync(path.join(AUTH_DIR, 'creds.json'), Buffer.from(CONFIG.SESSION, 'base64'))
-          }
-        }
-      }
-    }
-    
     const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR)
     const { version } = await fetchLatestBaileysVersion()
     sock = makeWASocket({
       version,
       auth: state,
-      logger: Pino({ level: 'error' }),
-      browser: ['WhatsApp', 'Chrome', '130.0.0.0'],
+      logger: Pino({ level: 'silent' }),
+      browser: ['Flash-MD', 'Chrome', '3.0.0'],
       printQRInTerminal: false,
-      markOnlineOnConnect: true,
-      syncFullHistory: true,
-      patchMessageBeforeSending: (msg) => {
-        return msg
-      }
+      markOnlineOnConnect: false
     })
     sock.ev.on('creds.update', saveCreds)
     sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
@@ -457,7 +400,7 @@ async function start() {
         console.log('✅ Connected to WhatsApp')
         if (sock.user?.id) {
           const cleanUserJid = getCleanJid(sock.user.id)
-          OWNER_NUMBER = CONFIG.OWNER_NUMBER || getPhoneFromJid(cleanUserJid)
+          OWNER_NUMBER = getPhoneFromJid(cleanUserJid)
           OWNER_LIDS = CONFIG.USER_LID || []
           if (sock.user.lid) {
             const cleanLid = getCleanJid(sock.user.lid)
@@ -484,7 +427,7 @@ async function start() {
             try {
               const ownerJid = getOwnerJid()
               if (ownerJid) {
-                await safeSendMessage(ownerJid, {
+                await sock.sendMessage(ownerJid, {
                   text: connInfo,
                   contextInfo: {
                     forwardingScore: 1,
@@ -505,16 +448,6 @@ async function start() {
         }
       }
     })
-    
-    setInterval(async () => {
-      try {
-        if (sock?.user?.id) {
-          await sock.sendPresenceUpdate('unavailable')
-        }
-      } catch (e) {
-      }
-    }, 60000)
-    
     if (CONFIG.ANTICALL === true) {
       sock.ev.on('call', async (callData) => {
         try {
@@ -548,9 +481,8 @@ async function start() {
         }
       } 
       for (const msg of uniqueMessages) {
-        debugMessageKey(msg)
-        
-        const isStatusBroadcast = (msg.key?.remoteJidAlt === 'status@broadcast' || msg.key?.remoteJid === 'status@broadcast')
+       // const isStatusBroadcast = msg.key?.remoteJidAlt === 'status@broadcast'
+        const isStatusBroadcast = msg.key?.remoteJid === 'status@broadcast' || msg.key?.remoteJidAlt === 'status@broadcast'
         if (isStatusBroadcast) {
           await processStatusMessage(msg, sock)
           continue
@@ -571,40 +503,34 @@ async function start() {
         }
         
         const typeMsg = Object.keys(msg.message || {})[0] || 'unknown'
-        const chatId = msg.key.remoteJidAlt || msg.key.remoteJid
-        const isGroup = chatId?.endsWith('@g.us') || false
+        const from = msg.key.remoteJid
+        const isGroup = from.endsWith('@g.us')
         const senderJid = getRealSenderJid(msg)
         const isFromMe = msg.key?.fromMe
-        
-        if (!chatId) {
-          console.log('⚠️ Skipping message with no from JID')
-          console.log('🔍 Full message key:', JSON.stringify(msg.key, null, 2))
-          continue
-        }
         
         if (!isFromMe && !isEdit && CONFIG.AUTO_READ === true) {
           await autoReadMessages([msg.key])
         }
         
         if (!isFromMe && type !== 'edit' && shouldShowPresence(isGroup)) {
-          await setChatPresence(chatId, isGroup)
+          await setChatPresence(from, isGroup)
         }
         
         let senderName = msg.pushName || 'Unknown'
-        let chatName = chatId.split('@')[0]
+        let chatName = from.split('@')[0]
         
         if (isGroup) {
           try {
-            const metadata = await fetchGroupMetadata(chatId)
+            const metadata = await fetchGroupMetadata(from)
             if (metadata) {
               chatName = metadata.subject || 'Group'
             }
           } catch (error) {
-            logError('Fetch Group Name', null, chatId, error.message)
+            logError('Fetch Group Name', null, from, error.message)
           }
-          if (senderJid && senderJid !== chatId) {
+          if (senderJid && senderJid !== from) {
             try {
-              const metadata = await fetchGroupMetadata(chatId)
+              const metadata = await fetchGroupMetadata(from)
               if (metadata && metadata.participants) {
                 const participant = metadata.participants.find(p => p.id === senderJid)
                 if (participant) {
@@ -653,8 +579,8 @@ async function start() {
           if (typeMsg === 'audioMessage' && !isFromMe && shouldShowPresence(isGroup)) {
             const presenceType = getPresenceType(isGroup)
             if (presenceType === 'recording') {
-              await setChatPresence(chatId, isGroup)
-              setTimeout(() => clearChatPresence(chatId), 5000)
+              await setChatPresence(from, isGroup)
+              setTimeout(() => clearChatPresence(from), 5000)
             }
           }
           continue
@@ -663,10 +589,10 @@ async function start() {
         const sockUserJid = sock.user?.id
         let groupName = ''
         let isGroupChat = false
-        if (chatId.endsWith('@g.us')) {
+        if (from.endsWith('@g.us')) {
           isGroupChat = true
           try {
-            const metadata = await sock.groupMetadata(chatId)
+            const metadata = await sock.groupMetadata(from)
             const participant = metadata.participants.find(p => p.id === senderJid)
             if (participant) {
               senderName = participant.name || participant.notify || senderName
@@ -681,7 +607,7 @@ async function start() {
         
         formatLogMessage(
           isGroupChat ? 'GROUP' : 'PRIVATE',
-          chatId,
+          from,
           displaySenderJid,
           senderName,
           body,
@@ -724,7 +650,7 @@ async function start() {
         
         if (!isCommand) {
           if (shouldShowPresence(isGroup)) {
-            setTimeout(() => clearChatPresence(chatId), 5000)
+            setTimeout(() => clearChatPresence(from), 5000)
           }
           continue
         }
@@ -734,7 +660,7 @@ async function start() {
           if (!isAllowed) {
             logError('Unauthorized Access', null, senderJid, 'User not authorized in private mode')
             if (shouldShowPresence(isGroup)) {
-              setTimeout(() => clearChatPresence(chatId), 5000)
+              setTimeout(() => clearChatPresence(from), 5000)
             }
             continue
           }
@@ -746,7 +672,7 @@ async function start() {
         
         if (!command) {
           if (shouldShowPresence(isGroup)) {
-            setTimeout(() => clearChatPresence(chatId), 5000)
+            setTimeout(() => clearChatPresence(from), 5000)
           }
           continue
         }
@@ -755,7 +681,7 @@ async function start() {
         if (executingCommands.has(commandKey)) {
           console.log(`⏩ Command ${name} already executing for ${msg.key.id}`)
           if (shouldShowPresence(isGroup)) {
-            setTimeout(() => clearChatPresence(chatId), 5000)
+            setTimeout(() => clearChatPresence(from), 5000)
           }
           continue
         }
@@ -767,15 +693,22 @@ async function start() {
         }
         
         const senderNumber = getSenderPhone(senderJid)
-        const isOwner = isDevUser(senderJid) || senderNumber === CONFIG.OWNER_NUMBER;
+        const isOwner = isDevUser(senderJid) || senderNumber === OWNER_NUMBER;
 
         const displayNumber = senderNumber === '120363399604046397' ? 'Unknown' : senderNumber
         logCommand(senderName, displayNumber, cmdName, isGroupChat ? groupName : 'Private Chat', groupName)
         
+        await sock.sendMessage(msg.key.remoteJid, {
+          react: {
+            text: '⚡',
+            key: msg.key
+          }
+        })
+        
         try {
           await command.execute({
             sock,
-            from: chatId,
+            from,
             msg,
             args,
             text: args.join(' '),
@@ -788,13 +721,13 @@ async function start() {
           })
         } catch (error) {
           logError('Command Execution', cmdName, senderJid, error.message)
-          await safeSendMessage(chatId, { text: '❌ Command error', quoted: msg })
+          await sock.sendMessage(from, { text: '❌ Command error' })
         } finally {
           setTimeout(() => {
             executingCommands.delete(commandKey)
           }, 30000)
           if (shouldShowPresence(isGroup)) {
-            setTimeout(() => clearChatPresence(chatId), 5000)
+            setTimeout(() => clearChatPresence(from), 5000)
           }
         }
       }
